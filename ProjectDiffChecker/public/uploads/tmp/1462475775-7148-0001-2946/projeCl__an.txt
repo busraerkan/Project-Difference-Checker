@@ -1,0 +1,84 @@
+#include "opencv2/highgui/highgui.hpp"
+#include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <iostream>
+#include <vector>
+#include <stdio.h>
+#include "linefinder.h"
+
+#define PI 3.1415926
+
+using namespace cv;
+
+int main(int argc, char* argv[]) {
+	int houghVote = 200;
+	string arg = "C:/Users/buse/Documents/Visual Studio 2013/Projects/hw3/hw3/yol1.avi";
+	bool showSteps = 1;
+	VideoCapture capture(arg);
+	if (!capture.isOpened()) 
+	{
+		capture.open(atoi(arg.c_str()));
+	}
+	Mat image;
+	image = imread("C:/Users/buse/Documents/Visual Studio 2013/Projects/hw3/hw3/yol1.avi");
+	while (1)
+	{
+		capture >> image;
+		if (image.empty())
+			break;
+		Mat gray;
+		cvtColor(image, gray, CV_RGB2GRAY);
+		vector<string> codes;
+		Mat corners;
+		
+		Rect roi(0,0, image.cols-1, image.rows - image.cols/2.5);// set the ROI for the image
+		Mat imgROI = image(roi);
+		// Canny algorithm
+		Mat contours;
+		Canny(imgROI, contours, 50, 250);
+	//	Mat contoursInv;
+		//threshold(contours, contoursInv, 128, 255, THRESH_BINARY_INV);
+		std::vector<Vec2f> lines;
+
+		if (houghVote < 1 || lines.size() > 2){
+			houghVote = 200;
+		}
+		else{ houghVote += 25; }
+		while (lines.size() < 5 && houghVote > 0){
+			HoughLines(contours, lines, 1, PI / 180, houghVote);
+			houghVote -= 5;
+		}
+	
+		Mat result(imgROI.size(), CV_8U, Scalar(255));
+		imgROI.copyTo(result);
+
+		// Draw the limes
+		std::vector<Vec2f>::const_iterator it = lines.begin();
+		Mat hough(imgROI.size(), CV_8U, Scalar(0));
+		while (it != lines.end()) {
+
+			float rho = (*it)[0];   // first element is distance rho
+			float theta = (*it)[1]; // second element is angle theta
+
+			if (theta > 0.09 && theta < 1.0 || theta < 3.5 && theta > 2) { 
+				Point pt1(rho / cos(theta), 0);
+				Point pt2((rho - result.rows*sin(theta)) / cos(theta), result.rows);
+				line(result, pt1, pt2, Scalar(255), 8);
+
+			}
+
+			//std::cout << "line: (" << rho << "," << theta << ")\n"; 
+			++it;
+		}
+
+		// Display the detected line image
+		if (showSteps){
+			namedWindow("Detected Lines with Hough");
+			imshow("Detected Lines with Hough", result);
+		
+		}
+	
+		char key = (char)waitKey(10);
+		lines.clear();
+	}
+}
